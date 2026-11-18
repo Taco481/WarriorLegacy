@@ -1,0 +1,1465 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Woudspoor — De Vergeten Bron</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: #f4f0dc;
+      background: #101914;
+    }
+
+    * { box-sizing: border-box; }
+
+    body { margin: 0; overflow: hidden; }
+
+    canvas { display: block; }
+
+    #hud {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      pointer-events: none;
+      text-shadow: 0 2px 8px #08100b;
+    }
+
+    .panel {
+      width: min(360px, calc(100vw - 32px));
+      padding: 16px 18px;
+      border: 1px solid #d6c68b66;
+      border-radius: 14px;
+      background: #111a16d9;
+      box-shadow: 0 8px 30px #0005;
+    }
+
+    h1 {
+      margin: 0 0 5px;
+      color: #f4dda0;
+      font-size: 19px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    #objective { margin: 0; color: #e4e6d6; font-size: 14px; line-height: 1.5; }
+    #counter { margin-top: 10px; color: #f4dda0; font-weight: 700; }
+    #world-time { margin-top: 8px; color: #c8d8dc; font-size: 12px; letter-spacing: .04em; }
+
+    #minimap {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 1;
+      width: 280px;
+      padding: 12px;
+      border: 1px solid #d6c68b66;
+      border-radius: 14px;
+      background: #111a16e8;
+      box-shadow: 0 8px 30px #0005;
+      pointer-events: none;
+      text-shadow: 0 2px 8px #08100b;
+    }
+
+    #minimap h2 {
+      margin: 0 0 8px;
+      color: #f4dda0;
+      font-size: 13px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    #map-canvas {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+
+    #map-legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 5px;
+      margin-top: 8px;
+      color: #e2e4d7;
+      font-size: 10px;
+    }
+
+    #map-legend span { white-space: nowrap; }
+    #map-rival-key { color: #f08a72; }
+
+    .combat-hud {
+      display: grid;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .combat-hud[hidden] { display: none; }
+    .health-row { display: grid; grid-template-columns: 58px 1fr 30px; align-items: center; gap: 7px; font-size: 11px; }
+    .health-track { height: 8px; overflow: hidden; border-radius: 99px; background: #39433a; }
+    .health-fill { width: 100%; height: 100%; border-radius: inherit; transition: width .18s; }
+    #player-health-fill { background: #91c875; }
+    #rival-health-fill { background: #dc795f; }
+
+    #help {
+      align-self: center;
+      max-width: 650px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: #111a16c9;
+      color: #e2e4d7;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    #prompt {
+      position: fixed;
+      left: 50%;
+      bottom: 86px;
+      transform: translateX(-50%);
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: #111a16e8;
+      color: #f4dda0;
+      font-weight: 700;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    #message {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: #08100bc9;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .35s, visibility .35s;
+    }
+
+    #message.visible { opacity: 1; visibility: visible; }
+
+    .message-card {
+      max-width: 480px;
+      padding: 30px;
+      border: 1px solid #d6c68b88;
+      border-radius: 18px;
+      background: #17241c;
+      text-align: center;
+      box-shadow: 0 20px 70px #0008;
+    }
+
+    .message-card h2 { margin: 0 0 10px; color: #f4dda0; font-size: 28px; }
+    .message-card p { color: #e2e4d7; line-height: 1.6; }
+    .message-card button {
+      margin-top: 10px;
+      padding: 11px 20px;
+      border: 0;
+      border-radius: 8px;
+      background: #d7bd75;
+      color: #182017;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    @media (max-width: 520px) {
+      #hud { padding: 14px; }
+      .panel { padding: 13px 15px; }
+      #minimap { top: 180px; right: 14px; width: 180px; padding: 9px; }
+      #map-legend { font-size: 9px; }
+      #help { border-radius: 12px; line-height: 1.6; }
+    }
+
+    @media (max-width: 700px) and (max-height: 520px) {
+      #minimap { top: 170px; width: 135px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <section class="panel" aria-live="polite">
+      <h1>Woudspoor</h1>
+      <p id="objective">Zoek maanbloemen voor de zieke bosdieren.</p>
+      <div id="counter">Maanbloemen: 0 / 5</div>
+      <div id="world-time" aria-live="off">Dag · 12:00</div>
+      <div id="combat-hud" class="combat-hud" hidden>
+        <div class="health-row">
+          <span>Jij</span>
+          <div class="health-track"><div id="player-health-fill" class="health-fill"></div></div>
+          <span id="player-health-label">100</span>
+        </div>
+        <div class="health-row">
+          <span>Tigerclaw</span>
+          <div class="health-track"><div id="rival-health-fill" class="health-fill"></div></div>
+          <span id="rival-health-label">100</span>
+        </div>
+      </div>
+    </section>
+    <div id="help">WASD of pijltjes: lopen · Shift: rennen · Spatie: actie bij de Bron</div>
+  </div>
+  <aside id="minimap" aria-label="Kaart van het bos">
+    <h2>Kaart</h2>
+    <canvas id="map-canvas" width="240" height="240" aria-hidden="true"></canvas>
+    <div id="map-legend"><span>▲ Jij</span><span>✦ Bloem</span><span>● Bron</span><span id="map-rival-key" hidden>◆ Rivaal</span></div>
+  </aside>
+  <div id="prompt"></div>
+  <div id="message">
+    <div class="message-card">
+      <h2 id="ending-title">De bron is weer helder</h2>
+      <p id="ending-text"></p>
+      <button id="restart">Opnieuw spelen</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js";
+
+    const scene = new THREE.Scene();
+    const daySkyColor = new THREE.Color(0x91a9a9);
+    const nightSkyColor = new THREE.Color(0x111a2b);
+    const duskSkyColor = new THREE.Color(0xc87858);
+    const currentSkyColor = new THREE.Color();
+    scene.background = daySkyColor.clone();
+    scene.fog = new THREE.Fog(daySkyColor, 38, 92);
+
+    const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 220);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio * 2, 3));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    document.body.prepend(renderer.domElement);
+
+    const skyLight = new THREE.HemisphereLight(0xdce9ed, 0x344535, 1.65);
+    const nightSkyLightColor = new THREE.Color(0x50658e);
+    const daySkyLightColor = new THREE.Color(0xdce9ed);
+    const nightGroundLightColor = new THREE.Color(0x202c3d);
+    const dayGroundLightColor = new THREE.Color(0x344535);
+    scene.add(skyLight);
+    const sunlight = new THREE.DirectionalLight(0xffe4b7, 3);
+    const daySunColor = new THREE.Color(0xffe4b7);
+    const nightSunColor = new THREE.Color(0x7187b5);
+    const duskSunColor = new THREE.Color(0xffa06b);
+    sunlight.position.set(-25, 45, 18);
+    sunlight.castShadow = true;
+    sunlight.shadow.mapSize.set(4096, 4096);
+    sunlight.shadow.camera.left = -65;
+    sunlight.shadow.camera.right = 65;
+    sunlight.shadow.camera.top = 65;
+    sunlight.shadow.camera.bottom = -65;
+    sunlight.shadow.camera.near = 1;
+    sunlight.shadow.camera.far = 150;
+    sunlight.shadow.camera.updateProjectionMatrix();
+    sunlight.shadow.bias = -0.00015;
+    sunlight.shadow.normalBias = 0.035;
+    scene.add(sunlight);
+
+    const worldSize = 180;
+    const worldChunkSize = 36;
+    const chunkRenderDistance = 63;
+    function getChunkCoordinates(x, z) {
+      return {
+        column: Math.floor((x + worldSize / 2) / worldChunkSize),
+        row: Math.floor((z + worldSize / 2) / worldChunkSize)
+      };
+    }
+
+    function getChunkCenter(index) {
+      return -worldSize / 2 + (index + 0.5) * worldChunkSize;
+    }
+
+    function groundHeight(x, z) {
+      return Math.sin(x * 0.055) * 0.65 + Math.cos(z * 0.048) * 0.55
+        + Math.sin((x + z) * 0.035) * 0.6;
+    }
+
+    function makeGroundTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 512;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#718b5e";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      let textureSeed = 14327;
+      const textureRandom = () => {
+        textureSeed = (textureSeed * 1664525 + 1013904223) >>> 0;
+        return textureSeed / 4294967296;
+      };
+      const fleckColors = [
+        "rgba(35, 67, 38, 0.18)",
+        "rgba(193, 190, 133, 0.16)",
+        "rgba(225, 214, 161, 0.12)",
+        "rgba(48, 83, 43, 0.14)"
+      ];
+      for (let i = 0; i < 6200; i++) {
+        const size = 0.5 + textureRandom() * 2.8;
+        context.fillStyle = fleckColors[Math.floor(textureRandom() * fleckColors.length)];
+        context.beginPath();
+        context.ellipse(
+          textureRandom() * canvas.width,
+          textureRandom() * canvas.height,
+          size * 1.6,
+          size,
+          textureRandom() * Math.PI,
+          0,
+          Math.PI * 2
+        );
+        context.fill();
+      }
+      for (let i = 0; i < 440; i++) {
+        const x = textureRandom() * canvas.width;
+        const y = textureRandom() * canvas.height;
+        context.strokeStyle = "rgba(38, 71, 39, 0.2)";
+        context.lineWidth = 1 + textureRandom();
+        context.beginPath();
+        context.moveTo(x, y);
+        context.lineTo(x + 2 + textureRandom() * 5, y - 2 - textureRandom() * 5);
+        context.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(14, 14);
+      texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+      return texture;
+    }
+
+    const groundGeometry = new THREE.PlaneGeometry(worldSize, worldSize, 160, 160);
+    groundGeometry.rotateX(-Math.PI / 2);
+    const positions = groundGeometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      positions.setY(i, groundHeight(positions.getX(i), positions.getZ(i)));
+    }
+    groundGeometry.computeVertexNormals();
+    const ground = new THREE.Mesh(
+      groundGeometry,
+      new THREE.MeshStandardMaterial({ map: makeGroundTexture(), roughness: 0.96 })
+    );
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    function makeBarkTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 512;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#634d37";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < 180; i++) {
+        const x = Math.random() * canvas.width;
+        const width = 1 + Math.random() * 5;
+        context.strokeStyle = i % 3 === 0 ? "rgba(35, 25, 18, 0.3)" : "rgba(190, 151, 100, 0.18)";
+        context.lineWidth = width;
+        context.beginPath();
+        context.moveTo(x, 0);
+        context.bezierCurveTo(x + 12, 150, x - 10, 340, x + Math.random() * 18 - 9, canvas.height);
+        context.stroke();
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1, 1.5);
+      return texture;
+    }
+
+    function makeLeafTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#46663b";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      let leafSeed = 2741;
+      const leafRandom = () => {
+        leafSeed = (leafSeed * 1664525 + 1013904223) >>> 0;
+        return leafSeed / 4294967296;
+      };
+      const colors = ["#587b43", "#66894a", "#3b6039", "#769250", "#486b3b"];
+      for (let i = 0; i < 1100; i++) {
+        const x = leafRandom() * canvas.width;
+        const y = leafRandom() * canvas.height;
+        const length = 2 + leafRandom() * 5;
+        context.save();
+        context.translate(x, y);
+        context.rotate(leafRandom() * Math.PI);
+        context.fillStyle = colors[Math.floor(leafRandom() * colors.length)];
+        context.beginPath();
+        context.ellipse(0, 0, length, length * 0.43, 0, 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      return texture;
+    }
+
+    const materials = {
+      trunk: new THREE.MeshStandardMaterial({ map: makeBarkTexture(), roughness: 1 }),
+      leaves: [
+        new THREE.MeshStandardMaterial({ color: 0x2d5538, roughness: 1 }),
+        new THREE.MeshStandardMaterial({ color: 0x3c6740, roughness: 1 }),
+        new THREE.MeshStandardMaterial({ color: 0x456b42, roughness: 1 }),
+        new THREE.MeshStandardMaterial({ map: makeLeafTexture(), color: 0xffffff, roughness: 0.96 })
+      ]
+    };
+
+    let seed = 8723;
+    function random() {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    }
+    const forestMarkers = [];
+    const treeInstances = [];
+    for (let i = 0; i < 210; i++) {
+      const x = (random() - 0.5) * 160;
+      const z = (random() - 0.5) * 160;
+      if (Math.hypot(x, z) < 10 || Math.hypot(x - 34, z - 22) < 8) continue;
+      forestMarkers.push({ x, z });
+      treeInstances.push({
+        x,
+        z,
+        scale: 0.75 + random() * 0.7,
+        kind: random() < 0.76 ? "broadleaf" : "pine"
+      });
+    }
+
+    const treeBuckets = new Map();
+    for (const tree of treeInstances) {
+      const { column, row } = getChunkCoordinates(tree.x, tree.z);
+      const key = `${column},${row}`;
+      if (!treeBuckets.has(key)) treeBuckets.set(key, { column, row, trees: [] });
+      treeBuckets.get(key).trees.push(tree);
+    }
+
+    function addForestTrees(trees) {
+      const group = new THREE.Group();
+      const trunkBatch = new THREE.InstancedMesh(
+        new THREE.CylinderGeometry(0.25, 0.48, 5.2, 12),
+        materials.trunk,
+        trees.length
+      );
+      const pineBatches = materials.leaves.slice(0, 3).map((material, tier) =>
+        new THREE.InstancedMesh(
+          new THREE.ConeGeometry(2.35 - tier * 0.3, 3.4, 12),
+          material,
+          trees.length
+        )
+      );
+      const canopyClusters = [
+        { x: 0, y: 5.05, z: 0, sx: 1.65, sy: 1.7, sz: 1.6 },
+        { x: 1.25, y: 4.7, z: 0.2, sx: 1.28, sy: 1.35, sz: 1.3 },
+        { x: -1.2, y: 4.85, z: -0.15, sx: 1.3, sy: 1.4, sz: 1.35 },
+        { x: 0.25, y: 4.7, z: 1.25, sx: 1.3, sy: 1.35, sz: 1.25 },
+        { x: -0.2, y: 4.8, z: -1.25, sx: 1.3, sy: 1.35, sz: 1.3 },
+        { x: 0.45, y: 6.05, z: -0.25, sx: 1.25, sy: 1.25, sz: 1.2 },
+        { x: -0.55, y: 4.35, z: 0.2, sx: 1.15, sy: 1.2, sz: 1.25 }
+      ];
+      const broadleafBatch = new THREE.InstancedMesh(
+        new THREE.IcosahedronGeometry(1, 2),
+        materials.leaves[3],
+        trees.length * canopyClusters.length
+      );
+      const canopyPositions = broadleafBatch.geometry.attributes.position;
+      for (let vertex = 0; vertex < canopyPositions.count; vertex++) {
+        const x = canopyPositions.getX(vertex);
+        const y = canopyPositions.getY(vertex);
+        const z = canopyPositions.getZ(vertex);
+        const variation = 1 + Math.sin(x * 9 + y * 5) * Math.cos(z * 8 - y * 3) * 0.045;
+        canopyPositions.setXYZ(vertex, x * variation, y * variation, z * variation);
+      }
+      canopyPositions.needsUpdate = true;
+      broadleafBatch.geometry.computeVertexNormals();
+      const branchBatch = new THREE.InstancedMesh(
+        new THREE.CylinderGeometry(0.055, 0.14, 2.2, 8),
+        materials.trunk,
+        trees.length * 4
+      );
+      const dummy = new THREE.Object3D();
+      const tint = new THREE.Color();
+      const up = new THREE.Vector3(0, 1, 0);
+      const direction = new THREE.Vector3();
+      let branchCount = 0;
+      let canopyCount = 0;
+
+      for (let index = 0; index < trees.length; index++) {
+        const tree = trees[index];
+        const y = groundHeight(tree.x, tree.z);
+        const rotation = (tree.x * 0.17 + tree.z * 0.11) % (Math.PI * 2);
+        dummy.rotation.set(0, rotation, 0);
+        const trunkScale = tree.kind === "pine" ? tree.scale * 0.85 : tree.scale;
+        dummy.scale.set(tree.scale, trunkScale, tree.scale);
+        dummy.position.set(tree.x, y + 2.6 * trunkScale, tree.z);
+        dummy.updateMatrix();
+        trunkBatch.setMatrixAt(index, dummy.matrix);
+
+        for (let tier = 0; tier < pineBatches.length; tier++) {
+          if (tree.kind === "pine") {
+            dummy.scale.setScalar(tree.scale);
+            dummy.position.set(tree.x, y + (3.05 + tier * 1.4) * tree.scale, tree.z);
+            dummy.rotation.set(0, rotation, 0);
+            tint.setRGB(0.82 + tier * 0.07, 0.82 + tier * 0.07, 0.82 + tier * 0.07);
+          } else {
+            dummy.scale.set(0, 0, 0);
+            tint.setRGB(1, 1, 1);
+          }
+          dummy.updateMatrix();
+          pineBatches[tier].setMatrixAt(index, dummy.matrix);
+          pineBatches[tier].setColorAt(index, tint);
+        }
+
+        if (tree.kind === "broadleaf") {
+          for (let branch = 0; branch < 4; branch++) {
+            const angle = rotation + branch * Math.PI / 2;
+            direction.set(Math.cos(angle) * 0.78, 0.63 + (branch % 2) * 0.12, Math.sin(angle) * 0.78).normalize();
+            dummy.position.set(tree.x, y + (2.35 + branch * 0.32) * tree.scale, tree.z);
+            dummy.position.addScaledVector(direction, tree.scale * 0.95);
+            dummy.quaternion.setFromUnitVectors(up, direction);
+            dummy.scale.setScalar(tree.scale);
+            dummy.updateMatrix();
+            branchBatch.setMatrixAt(branchCount, dummy.matrix);
+            branchCount++;
+          }
+
+          for (let clusterIndex = 0; clusterIndex < canopyClusters.length; clusterIndex++) {
+            const cluster = canopyClusters[clusterIndex];
+            const cos = Math.cos(rotation);
+            const sin = Math.sin(rotation);
+            const offsetX = cluster.x * cos + cluster.z * sin;
+            const offsetZ = -cluster.x * sin + cluster.z * cos;
+            dummy.position.set(
+              tree.x + offsetX * tree.scale,
+              y + cluster.y * tree.scale,
+              tree.z + offsetZ * tree.scale
+            );
+            dummy.rotation.set(0, rotation + clusterIndex * 0.43, 0);
+            dummy.scale.set(cluster.sx * tree.scale, cluster.sy * tree.scale, cluster.sz * tree.scale);
+            dummy.updateMatrix();
+            broadleafBatch.setMatrixAt(canopyCount, dummy.matrix);
+            const shade = 0.82 + (Math.sin(tree.x * 0.2 + tree.z * 0.16 + clusterIndex) + 1) * 0.08;
+            tint.setRGB(shade, shade * 1.03, shade * 0.88);
+            broadleafBatch.setColorAt(canopyCount, tint);
+            canopyCount++;
+          }
+        }
+      }
+
+      branchBatch.count = branchCount;
+      broadleafBatch.count = canopyCount;
+      branchBatch.instanceMatrix.needsUpdate = true;
+      broadleafBatch.instanceMatrix.needsUpdate = true;
+      if (branchBatch.instanceColor) branchBatch.instanceColor.needsUpdate = true;
+      if (broadleafBatch.instanceColor) broadleafBatch.instanceColor.needsUpdate = true;
+      trunkBatch.castShadow = true;
+      trunkBatch.receiveShadow = true;
+      group.add(trunkBatch);
+      branchBatch.castShadow = true;
+      branchBatch.receiveShadow = true;
+      group.add(branchBatch);
+      broadleafBatch.castShadow = true;
+      broadleafBatch.receiveShadow = true;
+      group.add(broadleafBatch);
+      for (const batch of pineBatches) {
+        batch.instanceMatrix.needsUpdate = true;
+        if (batch.instanceColor) batch.instanceColor.needsUpdate = true;
+        batch.castShadow = true;
+        batch.receiveShadow = true;
+        group.add(batch);
+      }
+      return group;
+    }
+
+    const treeChunks = [];
+    for (const bucket of treeBuckets.values()) {
+      const group = addForestTrees(bucket.trees);
+      scene.add(group);
+      treeChunks.push({
+        group,
+        x: getChunkCenter(bucket.column),
+        z: getChunkCenter(bucket.row)
+      });
+    }
+
+    const spring = new THREE.Group();
+    spring.position.set(34, groundHeight(34, 22), 22);
+    const pool = new THREE.Mesh(
+      new THREE.CylinderGeometry(3.2, 3.5, 0.28, 32),
+      new THREE.MeshStandardMaterial({ color: 0x6bb4b3, roughness: 0.25, metalness: 0.12 })
+    );
+    pool.position.y = 0.16;
+    spring.add(pool);
+    const rim = new THREE.Mesh(
+      new THREE.TorusGeometry(3.35, 0.28, 8, 32),
+      new THREE.MeshStandardMaterial({ color: 0xb5aa78, roughness: 0.85 })
+    );
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.27;
+    spring.add(rim);
+    const archMat = new THREE.MeshStandardMaterial({ color: 0x857654, roughness: 1 });
+    for (const x of [-1.6, 1.6]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 3.5, 8), archMat);
+      post.position.set(x, 1.9, -2.7);
+      post.castShadow = true;
+      spring.add(post);
+    }
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.55, 0.55), archMat);
+    lintel.position.set(0, 3.55, -2.7);
+    lintel.castShadow = true;
+    spring.add(lintel);
+    scene.add(spring);
+
+    function makeFurTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#ece5d7";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      let furSeed = 5831;
+      const furRandom = () => {
+        furSeed = (furSeed * 1664525 + 1013904223) >>> 0;
+        return furSeed / 4294967296;
+      };
+      for (let i = 0; i < 3400; i++) {
+        const x = furRandom() * canvas.width;
+        const y = furRandom() * canvas.height;
+        const length = 2 + furRandom() * 8;
+        context.strokeStyle = i % 3 === 0 ? "rgba(91, 77, 60, 0.13)" : "rgba(255, 252, 240, 0.4)";
+        context.lineWidth = 0.45 + furRandom() * 0.8;
+        context.beginPath();
+        context.moveTo(x, y);
+        context.quadraticCurveTo(
+          x + (furRandom() - 0.5) * 2,
+          y + length * 0.5,
+          x + (furRandom() - 0.5) * 3,
+          y + length
+        );
+        context.stroke();
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
+      return texture;
+    }
+
+    const furTexture = makeFurTexture();
+    function makeCat(furColor = 0xb9774e, creamColor = 0xe9c99b, eyeColor = 0xc3d76b) {
+      const cat = new THREE.Group();
+      const fur = new THREE.MeshStandardMaterial({ map: furTexture, color: furColor, roughness: 0.96 });
+      const cream = new THREE.MeshStandardMaterial({ map: furTexture, color: creamColor, roughness: 0.96 });
+      const dark = new THREE.MeshStandardMaterial({ color: 0x473b32, roughness: 0.9 });
+      const stripes = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(furColor).multiplyScalar(0.54), roughness: 0.98
+      });
+      const innerEar = new THREE.MeshStandardMaterial({ color: 0xa9645d, roughness: 0.92 });
+      const noseMat = new THREE.MeshStandardMaterial({ color: 0x694741, roughness: 0.7 });
+      const mouthMat = new THREE.MeshStandardMaterial({ color: 0x514039, roughness: 0.92 });
+      const clawMat = new THREE.MeshStandardMaterial({ color: 0xd7cbb0, roughness: 0.78 });
+      const eyeMat = new THREE.MeshStandardMaterial({ color: eyeColor, roughness: 0.42 });
+      const pupilMat = new THREE.MeshStandardMaterial({ color: 0x171710, roughness: 0.2 });
+      const glintMat = new THREE.MeshBasicMaterial({ color: 0xfff8dc });
+      const whiskerMat = new THREE.MeshStandardMaterial({ color: 0xd9cbb0, roughness: 0.85 });
+      const sphere = (radius, widthSegments = 24, heightSegments = 18) =>
+        new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+      const eyeDetails = [];
+      const addCurve = (parent, points, radius, material, segments = 8) => {
+        const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+        const line = new THREE.Mesh(new THREE.TubeGeometry(curve, segments, radius, 5, false), material);
+        line.castShadow = true;
+        parent.add(line);
+        return line;
+      };
+
+      const body = new THREE.Mesh(sphere(0.7), fur);
+      body.scale.set(0.88, 0.72, 1.38);
+      body.position.set(0, 0.86, -0.08);
+      body.castShadow = true;
+      cat.add(body);
+
+      const shoulders = new THREE.Mesh(sphere(0.43), fur);
+      shoulders.scale.set(1, 0.94, 1.08);
+      shoulders.position.set(0, 0.92, 0.39);
+      shoulders.castShadow = true;
+      cat.add(shoulders);
+
+      const haunches = new THREE.Mesh(sphere(0.43), fur);
+      haunches.scale.set(1.03, 0.96, 1.1);
+      haunches.position.set(0, 0.86, -0.53);
+      haunches.castShadow = true;
+      cat.add(haunches);
+
+      const neck = new THREE.Mesh(sphere(0.39), fur);
+      neck.scale.set(0.88, 1.1, 0.88);
+      neck.position.set(0, 1.05, 0.62);
+      cat.add(neck);
+
+      const chest = new THREE.Mesh(sphere(0.31), cream);
+      chest.scale.set(0.77, 1.1, 0.53);
+      chest.position.set(0, 0.91, 0.84);
+      cat.add(chest);
+
+      const addSideStripes = (center, radii, count) => {
+        const [cx, cy, cz] = center;
+        const [rx, ry, rz] = radii;
+        for (const side of [-1, 1]) {
+          for (let index = 0; index < count; index++) {
+            const baseZ = cz + (index - (count - 1) / 2) * rz * 0.38;
+            const samples = [
+              [0.64, -0.18],
+              [0.25, -0.06],
+              [-0.2, 0.08],
+              [-0.62, 0.19]
+            ];
+            const points = samples.map(([height, zOffset]) => {
+              const y = cy + height * ry;
+              const z = baseZ + zOffset * rz;
+              const remaining = Math.max(0.08, 1 - height * height - ((z - cz) / rz) ** 2);
+              const x = cx + side * (rx * Math.sqrt(remaining) + 0.015);
+              return [x, y, z];
+            });
+            addCurve(cat, points, 0.018, stripes, 8);
+          }
+        }
+      };
+      addSideStripes([0, 0.92, 0.39], [0.43, 0.404, 0.464], 3);
+      addSideStripes([0, 0.86, -0.53], [0.443, 0.413, 0.473], 3);
+
+      const head = new THREE.Group();
+      head.position.set(0, 1.29, 0.91);
+      cat.add(head);
+      const face = new THREE.Mesh(sphere(0.43), fur);
+      face.scale.set(1.04, 0.92, 0.95);
+      face.castShadow = true;
+      head.add(face);
+      for (const side of [-1, 1]) {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.48, 6), fur);
+        ear.position.set(side * 0.29, 0.34, -0.01);
+        ear.rotation.z = side * -0.22;
+        ear.castShadow = true;
+        head.add(ear);
+
+        const earInset = new THREE.Mesh(new THREE.ConeGeometry(0.105, 0.29, 6), innerEar);
+        earInset.position.set(side * 0.29, 0.34, 0.065);
+        earInset.rotation.z = side * -0.22;
+        head.add(earInset);
+
+        const eyeSocket = new THREE.Mesh(sphere(0.097, 16, 12), dark);
+        eyeSocket.scale.set(1.15, 0.78, 0.48);
+        eyeSocket.position.set(side * 0.19, 0.035, 0.352);
+        head.add(eyeSocket);
+
+        const eye = new THREE.Mesh(sphere(0.069, 16, 12), eyeMat);
+        eye.scale.set(1.12, 0.86, 0.56);
+        eye.position.set(side * 0.19, 0.035, 0.397);
+        head.add(eye);
+
+        const pupil = new THREE.Mesh(sphere(0.044, 12, 10), pupilMat);
+        pupil.scale.set(0.48, 1.15, 0.48);
+        pupil.position.set(side * 0.19, 0.035, 0.432);
+        head.add(pupil);
+
+        const glint = new THREE.Mesh(sphere(0.015, 8, 6), glintMat);
+        glint.position.set(side * 0.19 - 0.018, 0.058, 0.452);
+        head.add(glint);
+        eyeDetails.push(eyeSocket, eye, pupil, glint);
+      }
+
+      for (const side of [-1, 1]) {
+        const cheek = new THREE.Mesh(sphere(0.19), fur);
+        cheek.scale.set(1, 0.78, 0.78);
+        cheek.position.set(side * 0.27, -0.13, 0.22);
+        head.add(cheek);
+
+        const muzzle = new THREE.Mesh(sphere(0.15), cream);
+        muzzle.scale.set(1.05, 0.78, 0.82);
+        muzzle.position.set(side * 0.105, -0.17, 0.36);
+        head.add(muzzle);
+
+        for (let dot = 0; dot < 3; dot++) {
+          const spot = new THREE.Mesh(sphere(0.018, 8, 6), mouthMat);
+          spot.position.set(side * (0.12 + (dot % 2) * 0.045), -0.14 - Math.floor(dot / 2) * 0.04, 0.478);
+          head.add(spot);
+        }
+
+        for (let whisker = 0; whisker < 3; whisker++) {
+          const startY = -0.15 - whisker * 0.035;
+          const curve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(side * 0.19, startY, 0.39),
+            new THREE.Vector3(side * 0.38, startY + 0.015, 0.43),
+            new THREE.Vector3(side * (0.57 + whisker * 0.035), startY + (whisker - 1) * 0.075, 0.4)
+          ]);
+          const whiskerLine = new THREE.Mesh(new THREE.TubeGeometry(curve, 8, 0.008, 5, false), whiskerMat);
+          head.add(whiskerLine);
+        }
+      }
+
+      const nose = new THREE.Mesh(sphere(0.065, 12, 10), noseMat);
+      nose.scale.set(1.2, 0.75, 0.68);
+      nose.position.set(0, -0.11, 0.49);
+      head.add(nose);
+      addCurve(head, [[0, -0.16, 0.485], [0, -0.22, 0.46]], 0.009, mouthMat, 5);
+      for (const side of [-1, 1]) {
+        addCurve(head, [
+          [0, -0.22, 0.46],
+          [side * 0.07, -0.27, 0.435],
+          [side * 0.14, -0.25, 0.418]
+        ], 0.009, mouthMat, 6);
+      }
+
+      const faceFront = (x, y) => 0.408 * Math.sqrt(Math.max(0.08, 1 - (x / 0.447) ** 2 - (y / 0.396) ** 2)) + 0.012;
+      for (let stripe = -1; stripe <= 1; stripe++) {
+        const x = stripe * 0.075;
+        addCurve(head, [
+          [x * 0.78, 0.12, faceFront(x * 0.78, 0.12)],
+          [x, 0.2, faceFront(x, 0.2)],
+          [x * 1.12, 0.29, faceFront(x * 1.12, 0.29)]
+        ], 0.012, stripes, 7);
+      }
+
+      const legs = [];
+      for (const x of [-0.42, 0.42]) {
+        for (const z of [-0.37, 0.48]) {
+          const leg = new THREE.Group();
+          leg.position.set(x, 0.64, z);
+          const isHindLeg = z < 0;
+          const isFrontLeg = !isHindLeg;
+          const hip = new THREE.Group();
+          leg.add(hip);
+          const upperLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.085, 0.32, 12), fur);
+          upperLeg.position.y = -0.16;
+          upperLeg.castShadow = true;
+          hip.add(upperLeg);
+          if (isHindLeg) {
+            const thigh = new THREE.Mesh(sphere(0.22), fur);
+            thigh.scale.set(0.92, 1.08, 1);
+            thigh.position.set(0, -0.06, -0.06);
+            hip.add(thigh);
+          }
+
+          const knee = new THREE.Group();
+          knee.position.y = -0.31;
+          hip.add(knee);
+          const lowerLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.083, 0.075, 0.31, 12), fur);
+          lowerLeg.position.y = -0.15;
+          lowerLeg.castShadow = true;
+          knee.add(lowerLeg);
+
+          const paw = new THREE.Group();
+          paw.position.set(0, -0.29, 0.035);
+          knee.add(paw);
+          const pawShape = new THREE.Mesh(sphere(0.14, 14, 10), cream);
+          pawShape.scale.set(1.12, 0.62, 1.28);
+          paw.add(pawShape);
+          for (let toe = -1; toe <= 1; toe++) {
+            const toeDetail = new THREE.Mesh(sphere(0.058, 10, 8), cream);
+            toeDetail.scale.set(0.78, 0.7, 1);
+            toeDetail.position.set(toe * 0.075, -0.01, 0.08);
+            paw.add(toeDetail);
+
+            const claw = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.075, 6), clawMat);
+            claw.rotation.x = Math.PI / 2;
+            claw.position.set(toe * 0.075, -0.01, 0.125);
+            paw.add(claw);
+          }
+          cat.add(leg);
+          legs.push({ hip, knee, paw, isFrontLeg, side: Math.sign(x) });
+        }
+      }
+
+      const tail = new THREE.Group();
+      tail.position.set(0, 1.06, -1.13);
+      const tailCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0.02, -0.36),
+        new THREE.Vector3(0, 0.2, -0.68),
+        new THREE.Vector3(0, 0.48, -0.91),
+        new THREE.Vector3(0, 0.56, -1.13)
+      ]);
+      const tailMesh = new THREE.Mesh(new THREE.TubeGeometry(tailCurve, 20, 0.115, 10, false), fur);
+      tailMesh.castShadow = true;
+      tail.add(tailMesh);
+      const tailTip = new THREE.Mesh(sphere(0.12, 12, 10), stripes);
+      tailTip.position.set(0, 0.56, -1.12);
+      tailTip.scale.set(0.88, 0.88, 1.2);
+      tail.add(tailTip);
+      cat.add(tail);
+      cat.userData = {
+        legs,
+        tail,
+        head,
+        body,
+        shoulders,
+        eyeDetails,
+        blinkOffset: Math.random() * 4.5,
+        attackStartedAt: -Infinity,
+        hitStartedAt: -Infinity,
+        attackSide: 1
+      };
+      return cat;
+    }
+
+    function animateCatPose(cat, elapsed, speed, gaitPhase, turning = 0) {
+      const speedRatio = THREE.MathUtils.clamp(Math.abs(speed) / 8.6, 0, 1);
+      const stride = speed < 0 ? -1 : 1;
+      const attackAge = elapsed - cat.userData.attackStartedAt;
+      const attack = attackAge >= 0 && attackAge < 0.42 ? Math.sin(Math.PI * attackAge / 0.42) : 0;
+      const hitAge = elapsed - cat.userData.hitStartedAt;
+      const hit = hitAge >= 0 && hitAge < 0.3 ? Math.sin(Math.PI * hitAge / 0.3) : 0;
+
+      cat.userData.legs.forEach((leg, index) => {
+        const walkPhase = [0, Math.PI / 2, Math.PI, Math.PI * 1.5][index];
+        const trotPhase = index === 0 || index === 3 ? 0 : Math.PI;
+        const phaseOffset = THREE.MathUtils.lerp(walkPhase, trotPhase, speedRatio);
+        const phase = gaitPhase + phaseOffset;
+        const swing = Math.sin(phase) * stride;
+        const recovery = Math.max(0, Math.sin(phase + 0.5));
+        const swipe = leg.isFrontLeg && leg.side === cat.userData.attackSide ? attack : 0;
+        leg.hip.rotation.x = swing * (0.17 + speedRatio * 0.28) + swipe * 0.85 - hit * 0.15;
+        leg.knee.rotation.x = recovery * (0.12 + speedRatio * (leg.isFrontLeg ? 0.42 : 0.58))
+          + swipe * 0.28 + hit * 0.18;
+        leg.paw.rotation.x = -leg.hip.rotation.x * 0.42 - leg.knee.rotation.x * 0.62;
+      });
+      const bodyPitch = Math.sin(gaitPhase * 2) * speedRatio * 0.028 + hit * 0.08;
+      cat.userData.body.rotation.x = bodyPitch;
+      cat.userData.body.scale.y = 0.72 + Math.sin(elapsed * 2.1) * 0.008;
+      cat.userData.shoulders.rotation.x = -bodyPitch * 0.35;
+      cat.userData.head.rotation.x = -bodyPitch * 0.7 - attack * 0.11 + hit * 0.12
+        + Math.sin(elapsed * 1.2) * (1 - speedRatio) * 0.018;
+      cat.userData.head.rotation.z = -turning * speedRatio * 0.045;
+      cat.userData.tail.rotation.z = Math.sin(elapsed * 2.1) * (0.1 + speedRatio * 0.08)
+        - turning * speedRatio * 0.12;
+      cat.userData.tail.rotation.x = Math.sin(elapsed * 1.4) * 0.06 + speedRatio * 0.1;
+
+      const blinkPhase = (elapsed + cat.userData.blinkOffset) % 4.5;
+      const blink = blinkPhase < 0.16 ? Math.sin(Math.PI * blinkPhase / 0.16) : 0;
+      for (const detail of cat.userData.eyeDetails) {
+        if (detail.userData.openScale === undefined) detail.userData.openScale = detail.scale.y;
+        detail.scale.y = detail.userData.openScale * (1 - blink * 0.92);
+      }
+    }
+
+    const player = makeCat();
+    player.position.set(0, groundHeight(0, 0), 0);
+    scene.add(player);
+
+    const rival = makeCat(0x4e5053, 0xb8a78d, 0xd5a842);
+    rival.scale.setScalar(1.12);
+    rival.position.set(-58, groundHeight(-58, 58), 58);
+    rival.visible = false;
+    scene.add(rival);
+    const rivalMarker = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.34),
+      new THREE.MeshStandardMaterial({ color: 0xed725e, emissive: 0x9d3026, emissiveIntensity: 1.2 })
+    );
+    rivalMarker.position.y = 3.3;
+    rival.add(rivalMarker);
+
+    const herbSpots = [
+      [-21, -25], [13, -38], [-44, 18], [47, -26], [3, 51]
+    ];
+    const herbs = [];
+    for (const [x, z] of herbSpots) {
+      const herb = new THREE.Group();
+      herb.position.set(x, groundHeight(x, z), z);
+      for (let i = 0; i < 3; i++) {
+        const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.045, 0.06, 0.7, 6),
+          new THREE.MeshStandardMaterial({ color: 0x547542 })
+        );
+        stem.position.y = 0.35;
+        stem.rotation.z = (i - 1) * 0.3;
+        herb.add(stem);
+        const bloom = new THREE.Mesh(
+          new THREE.SphereGeometry(0.2, 10, 8),
+          new THREE.MeshStandardMaterial({
+            color: 0xf0dc91, emissive: 0x8c6728, emissiveIntensity: 0.75, roughness: 0.45
+          })
+        );
+        bloom.position.set((i - 1) * 0.22, 0.73 + Math.abs(i - 1) * 0.08, 0);
+        herb.add(bloom);
+      }
+      scene.add(herb);
+      herbs.push({ mesh: herb, collected: false, phase: random() * Math.PI * 2 });
+    }
+
+    function addForestFloorDetails() {
+      let detailSeed = 19871;
+      const detailRandom = () => {
+        detailSeed = (detailSeed * 1664525 + 1013904223) >>> 0;
+        return detailSeed / 4294967296;
+      };
+      const chunks = new Map();
+      const getChunk = (x, z) => {
+        const { column, row } = getChunkCoordinates(x, z);
+        const key = `${column},${row}`;
+        if (!chunks.has(key)) chunks.set(key, { column, row, grass: [], stones: [] });
+        return chunks.get(key);
+      };
+      const hasClearance = (x, z) => Math.hypot(x, z) < 7
+        || Math.hypot(x - spring.position.x, z - spring.position.z) < 7
+        || herbSpots.some(([herbX, herbZ]) => Math.hypot(x - herbX, z - herbZ) < 2.5);
+
+      const grassCapacity = 2800;
+      const grassGeometry = new THREE.ConeGeometry(0.055, 0.42, 4);
+      const grassMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
+      for (let i = 0; i < grassCapacity; i++) {
+        const x = (detailRandom() - 0.5) * 172;
+        const z = (detailRandom() - 0.5) * 172;
+        if (hasClearance(x, z)) continue;
+        const scale = 0.55 + detailRandom() * 1.15;
+        getChunk(x, z).grass.push({
+          x,
+          z,
+          scale,
+          height: 0.65 + detailRandom() * 0.55,
+          rotation: detailRandom() * Math.PI,
+          tilt: (detailRandom() - 0.5) * 0.35,
+          hue: 0.24 + detailRandom() * 0.075,
+          saturation: 0.38 + detailRandom() * 0.24,
+          lightness: 0.25 + detailRandom() * 0.14
+        });
+      }
+
+      const stoneCapacity = 170;
+      const stoneGeometry = new THREE.DodecahedronGeometry(0.34, 0);
+      const stoneMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true });
+      for (let i = 0; i < stoneCapacity; i++) {
+        const x = (detailRandom() - 0.5) * 168;
+        const z = (detailRandom() - 0.5) * 168;
+        if (hasClearance(x, z)) continue;
+        getChunk(x, z).stones.push({
+          x,
+          z,
+          scaleX: 0.6 + detailRandom() * 1.2,
+          scaleY: 0.45 + detailRandom() * 0.8,
+          scaleZ: 0.6 + detailRandom() * 1.1,
+          rotateX: detailRandom() * 0.4,
+          rotateY: detailRandom() * Math.PI,
+          rotateZ: detailRandom() * 0.3,
+          hue: 0.09 + detailRandom() * 0.035,
+          saturation: 0.08 + detailRandom() * 0.12,
+          lightness: 0.34 + detailRandom() * 0.19
+        });
+      }
+
+      const detailChunks = [];
+      const dummy = new THREE.Object3D();
+      const tint = new THREE.Color();
+      for (const bucket of chunks.values()) {
+        const group = new THREE.Group();
+        if (bucket.grass.length > 0) {
+          const grass = new THREE.InstancedMesh(grassGeometry, grassMaterial, bucket.grass.length);
+          for (let index = 0; index < bucket.grass.length; index++) {
+            const blade = bucket.grass[index];
+            dummy.position.set(blade.x, groundHeight(blade.x, blade.z) + blade.scale * 0.19, blade.z);
+            dummy.rotation.set(0, blade.rotation, blade.tilt);
+            dummy.scale.set(blade.scale, blade.scale * blade.height, blade.scale);
+            dummy.updateMatrix();
+            grass.setMatrixAt(index, dummy.matrix);
+            tint.setHSL(blade.hue, blade.saturation, blade.lightness);
+            grass.setColorAt(index, tint);
+          }
+          grass.instanceMatrix.needsUpdate = true;
+          if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+          group.add(grass);
+        }
+
+        if (bucket.stones.length > 0) {
+          const stones = new THREE.InstancedMesh(stoneGeometry, stoneMaterial, bucket.stones.length);
+          for (let index = 0; index < bucket.stones.length; index++) {
+            const stone = bucket.stones[index];
+            dummy.position.set(stone.x, groundHeight(stone.x, stone.z) + 0.34 * stone.scaleY, stone.z);
+            dummy.rotation.set(stone.rotateX, stone.rotateY, stone.rotateZ);
+            dummy.scale.set(stone.scaleX, stone.scaleY, stone.scaleZ);
+            dummy.updateMatrix();
+            stones.setMatrixAt(index, dummy.matrix);
+            tint.setHSL(stone.hue, stone.saturation, stone.lightness);
+            stones.setColorAt(index, tint);
+          }
+          stones.instanceMatrix.needsUpdate = true;
+          if (stones.instanceColor) stones.instanceColor.needsUpdate = true;
+          stones.castShadow = true;
+          stones.receiveShadow = true;
+          group.add(stones);
+        }
+
+        scene.add(group);
+        detailChunks.push({
+          group,
+          x: getChunkCenter(bucket.column),
+          z: getChunkCenter(bucket.row)
+        });
+      }
+      return detailChunks;
+    }
+
+    const floorChunks = addForestFloorDetails();
+    const renderChunks = treeChunks.concat(floorChunks);
+    let nextChunkVisibilityUpdate = 0;
+
+    function updateChunkVisibility(elapsed) {
+      if (elapsed < nextChunkVisibilityUpdate) return;
+      nextChunkVisibilityUpdate = elapsed + 0.2;
+      const maxDistanceSquared = chunkRenderDistance * chunkRenderDistance;
+      for (const chunk of renderChunks) {
+        const dx = player.position.x - chunk.x;
+        const dz = player.position.z - chunk.z;
+        chunk.group.visible = dx * dx + dz * dz <= maxDistanceSquared;
+      }
+      for (const herb of herbs) {
+        const dx = player.position.x - herb.mesh.position.x;
+        const dz = player.position.z - herb.mesh.position.z;
+        herb.mesh.visible = dx * dx + dz * dz <= maxDistanceSquared;
+      }
+    }
+
+    const keys = new Set();
+    let collected = 0;
+    let gameEnded = false;
+    let questStage = "herbs";
+    let playerHealth = 100;
+    let rivalHealth = 100;
+    let nextPlayerAttack = 0;
+    let nextRivalAttack = 0;
+    const prompt = document.getElementById("prompt");
+    const counter = document.getElementById("counter");
+    const objective = document.getElementById("objective");
+    const message = document.getElementById("message");
+    const help = document.getElementById("help");
+    const combatHud = document.getElementById("combat-hud");
+    const mapCanvas = document.getElementById("map-canvas");
+    const mapContext = mapCanvas.getContext("2d");
+
+    function updateHealthBars() {
+      document.getElementById("player-health-fill").style.width = `${playerHealth}%`;
+      document.getElementById("player-health-label").textContent = playerHealth;
+      document.getElementById("rival-health-fill").style.width = `${rivalHealth}%`;
+      document.getElementById("rival-health-label").textContent = rivalHealth;
+    }
+
+    function mapPosition(x, z) {
+      const padding = 11;
+      const mapRange = mapCanvas.width - padding * 2;
+      return {
+        x: padding + ((x + worldSize / 2) / worldSize) * mapRange,
+        y: padding + ((z + worldSize / 2) / worldSize) * mapRange
+      };
+    }
+
+    function drawMinimap() {
+      const context = mapContext;
+      const size = mapCanvas.width;
+      context.clearRect(0, 0, size, size);
+      context.fillStyle = "#486947";
+      context.fillRect(0, 0, size, size);
+
+      context.fillStyle = "#55784f";
+      for (const tree of forestMarkers) {
+        const point = mapPosition(tree.x, tree.z);
+        context.beginPath();
+        context.arc(point.x, point.y, 1.5, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      const springPoint = mapPosition(spring.position.x, spring.position.z);
+      context.fillStyle = "#74d2d0";
+      context.beginPath();
+      context.arc(springPoint.x, springPoint.y, 5, 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = "#d4f4d6";
+      context.lineWidth = 1.5;
+      context.stroke();
+
+      for (const herb of herbs) {
+        if (herb.collected) continue;
+        const point = mapPosition(herb.mesh.position.x, herb.mesh.position.z);
+        context.fillStyle = "#f4dda0";
+        context.beginPath();
+        context.arc(point.x, point.y, 3.5, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      if (questStage === "rival" && rivalHealth > 0) {
+        const rivalPoint = mapPosition(rival.position.x, rival.position.z);
+        context.fillStyle = "#ed725e";
+        context.beginPath();
+        context.moveTo(rivalPoint.x, rivalPoint.y - 6);
+        context.lineTo(rivalPoint.x + 6, rivalPoint.y);
+        context.lineTo(rivalPoint.x, rivalPoint.y + 6);
+        context.lineTo(rivalPoint.x - 6, rivalPoint.y);
+        context.closePath();
+        context.fill();
+      }
+
+      const playerPoint = mapPosition(player.position.x, player.position.z);
+      context.save();
+      context.translate(playerPoint.x, playerPoint.y);
+      context.rotate(-player.rotation.y);
+      context.fillStyle = "#fff8de";
+      context.strokeStyle = "#372f20";
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.moveTo(0, 6);
+      context.lineTo(-5, -4);
+      context.lineTo(5, -4);
+      context.closePath();
+      context.fill();
+      context.stroke();
+      context.restore();
+    }
+
+    addEventListener("keydown", (event) => {
+      const key = event.key.toLowerCase();
+      if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key)) event.preventDefault();
+      keys.add(key);
+      if (key === " " && !gameEnded) interact();
+      if (key === "f" && !gameEnded) attackRival();
+    });
+    addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
+    addEventListener("blur", () => keys.clear());
+
+    function interact() {
+      if (questStage !== "spring" || Math.hypot(player.position.x - spring.position.x, player.position.z - spring.position.z) > 8) return;
+      questStage = "rival";
+      rival.visible = true;
+      combatHud.hidden = false;
+      document.getElementById("map-rival-key").hidden = false;
+      objective.textContent = "Zoek Tigerclaw, de verbannen wachter, en versla hem.";
+      help.textContent = "WASD of pijltjes: lopen · Shift: rennen · F: aanvallen";
+    }
+
+    function attackRival() {
+      if (questStage !== "rival" || performance.now() < nextPlayerAttack) return;
+      nextPlayerAttack = performance.now() + 550;
+      const distance = Math.hypot(player.position.x - rival.position.x, player.position.z - rival.position.z);
+      if (distance > 3.8) {
+        prompt.textContent = "Kom dichterbij om aan te vallen";
+        prompt.style.opacity = "1";
+        return;
+      }
+
+      player.userData.attackStartedAt = clock.elapsedTime;
+      player.userData.attackSide *= -1;
+      rival.userData.hitStartedAt = clock.elapsedTime;
+      rivalHealth = Math.max(0, rivalHealth - 25);
+      updateHealthBars();
+      if (rivalHealth === 0) finishGame(true);
+    }
+
+    function finishGame(won) {
+      gameEnded = true;
+      questStage = won ? "won" : "lost";
+      document.getElementById("ending-title").textContent = won ? "Het woud is veilig" : "Je bent verslagen";
+      document.getElementById("ending-text").textContent = won
+        ? "Je hebt Tigerclaw verslagen en de rust in het woud hersteld. De maanbloemen zijn terug bij de Bron en de dieren kunnen veilig drinken."
+        : "Tigerclaw heeft je verslagen. Rust even uit en probeer het opnieuw.";
+      message.classList.add("visible");
+    }
+
+    document.getElementById("restart").addEventListener("click", () => location.reload());
+
+    const clock = new THREE.Clock();
+    const desiredCamera = new THREE.Vector3();
+    const lookTarget = new THREE.Vector3();
+    let playerSpeed = 0;
+    let playerGaitPhase = 0;
+    let rivalGaitPhase = 0;
+    const DAY_LENGTH_SECONDS = 10 * 60;
+    const NIGHT_LENGTH_SECONDS = 5 * 60;
+    const CYCLE_LENGTH_SECONDS = DAY_LENGTH_SECONDS + NIGHT_LENGTH_SECONDS;
+    const TWILIGHT_SECONDS = 45;
+    const worldTimeLabel = document.getElementById("world-time");
+    let lastWorldTimeUpdate = -1;
+
+    function smoothStep(value) {
+      const t = THREE.MathUtils.clamp(value, 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
+    function updateDayNight(elapsed) {
+      const cycleSeconds = (elapsed + DAY_LENGTH_SECONDS / 2) % CYCLE_LENGTH_SECONDS;
+      let daylight;
+      if (cycleSeconds < DAY_LENGTH_SECONDS) {
+        if (cycleSeconds < TWILIGHT_SECONDS) {
+          daylight = smoothStep(cycleSeconds / TWILIGHT_SECONDS);
+        } else if (cycleSeconds > DAY_LENGTH_SECONDS - TWILIGHT_SECONDS) {
+          daylight = 1 - smoothStep((cycleSeconds - DAY_LENGTH_SECONDS + TWILIGHT_SECONDS) / TWILIGHT_SECONDS);
+        } else {
+          daylight = 1;
+        }
+      } else {
+        const nightSeconds = cycleSeconds - DAY_LENGTH_SECONDS;
+        daylight = nightSeconds > NIGHT_LENGTH_SECONDS - TWILIGHT_SECONDS
+          ? smoothStep(1 - (nightSeconds - NIGHT_LENGTH_SECONDS + TWILIGHT_SECONDS) / TWILIGHT_SECONDS)
+          : 0;
+      }
+
+      const twilight = 1 - Math.abs(daylight * 2 - 1);
+      if (daylight > 0) {
+        currentSkyColor.copy(daySkyColor).lerp(nightSkyColor, 1 - daylight);
+        if (twilight > 0) currentSkyColor.lerp(duskSkyColor, twilight * 0.42);
+      } else {
+        currentSkyColor.copy(nightSkyColor);
+      }
+      scene.background.copy(currentSkyColor);
+      scene.fog.color.copy(currentSkyColor);
+      skyLight.intensity = 0.38 + daylight * 1.27;
+      skyLight.color.copy(nightSkyLightColor).lerp(daySkyLightColor, daylight);
+      skyLight.groundColor.copy(nightGroundLightColor).lerp(dayGroundLightColor, daylight);
+
+      sunlight.intensity = 0.16 + daylight * 2.84;
+      sunlight.color.copy(nightSunColor).lerp(daySunColor, daylight);
+      if (twilight > 0) sunlight.color.lerp(duskSunColor, twilight * 0.65);
+      const sunAngle = (cycleSeconds / CYCLE_LENGTH_SECONDS) * Math.PI * 2 - Math.PI / 2;
+      sunlight.position.set(Math.cos(sunAngle) * 32, 8 + daylight * 38, Math.sin(sunAngle) * 32);
+      sunlight.castShadow = daylight > 0.08;
+      renderer.toneMappingExposure = 0.78 + daylight * 0.34;
+
+      if (elapsed - lastWorldTimeUpdate >= 0.25) {
+        const gameMinutes = cycleSeconds < DAY_LENGTH_SECONDS
+          ? 360 + (cycleSeconds / DAY_LENGTH_SECONDS) * 720
+          : 1080 + ((cycleSeconds - DAY_LENGTH_SECONDS) / NIGHT_LENGTH_SECONDS) * 720;
+        const minuteOfDay = Math.floor(gameMinutes) % (24 * 60);
+        const hours = Math.floor(minuteOfDay / 60).toString().padStart(2, "0");
+        const minutes = (minuteOfDay % 60).toString().padStart(2, "0");
+        worldTimeLabel.textContent = `${cycleSeconds < DAY_LENGTH_SECONDS ? "Dag" : "Nacht"} · ${hours}:${minutes}`;
+        lastWorldTimeUpdate = elapsed;
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.04);
+      const elapsed = clock.elapsedTime;
+      updateDayNight(elapsed);
+      const turning = (keys.has("a") || keys.has("arrowleft") ? 1 : 0)
+        - (keys.has("d") || keys.has("arrowright") ? 1 : 0);
+      const forwardInput = (keys.has("w") || keys.has("arrowup") ? 1 : 0)
+        - (keys.has("s") || keys.has("arrowdown") ? 1 : 0);
+      const sprinting = keys.has("shift");
+      let rivalMoving = false;
+      const targetSpeed = gameEnded ? 0
+        : forwardInput * (sprinting ? 8.6 : 5.2) * (forwardInput < 0 ? 0.62 : 1);
+      playerSpeed = THREE.MathUtils.damp(playerSpeed, targetSpeed, targetSpeed === 0 ? 8 : 5.5, delta);
+      playerGaitPhase += delta * (4 + Math.abs(playerSpeed) * 1.2);
+      rivalGaitPhase += delta * (4 + 2.1 * 1.2);
+
+      if (!gameEnded) {
+        const turnSpeed = THREE.MathUtils.lerp(2.15, 1.55, Math.min(Math.abs(playerSpeed) / 5.2, 1));
+        player.rotation.y += turning * turnSpeed * delta;
+        player.position.x += Math.sin(player.rotation.y) * playerSpeed * delta;
+        player.position.z += Math.cos(player.rotation.y) * playerSpeed * delta;
+        player.position.x = THREE.MathUtils.clamp(player.position.x, -84, 84);
+        player.position.z = THREE.MathUtils.clamp(player.position.z, -84, 84);
+        player.position.y = groundHeight(player.position.x, player.position.z);
+
+        const distanceToSpring = Math.hypot(
+          player.position.x - spring.position.x, player.position.z - spring.position.z
+        );
+        const nearbyHerb = herbs.find(({ mesh, collected: isCollected }) =>
+          !isCollected && Math.hypot(mesh.position.x - player.position.x, mesh.position.z - player.position.z) < 2.4
+        );
+        if (nearbyHerb) {
+          nearbyHerb.collected = true;
+          scene.remove(nearbyHerb.mesh);
+          collected++;
+          counter.textContent = `Maanbloemen: ${collected} / ${herbs.length}`;
+          if (collected === herbs.length) {
+            questStage = "spring";
+            objective.textContent = "Alle bloemen gevonden! Breng ze naar de Vergeten Bron.";
+          }
+        }
+
+        const canUseSpring = distanceToSpring < 8;
+        if (questStage === "rival") {
+          const rivalDistance = Math.hypot(player.position.x - rival.position.x, player.position.z - rival.position.z);
+          prompt.textContent = rivalDistance < 4.5 ? "Druk op F om Tigerclaw aan te vallen" : "Volg de rode markering op de kaart en druk op F om aan te vallen";
+          prompt.style.opacity = rivalDistance < 4.5 ? "1" : "0";
+        } else {
+          prompt.textContent = collected < herbs.length
+            ? `${collected} van ${herbs.length} maanbloemen — zoek de zachte gouden gloed`
+            : canUseSpring ? "Druk op spatie om de bloemen bij de Bron te brengen" : "Breng de maanbloemen naar de Vergeten Bron";
+          prompt.style.opacity = canUseSpring && collected === herbs.length ? "1" : nearbyHerb ? "1" : "0";
+        }
+      }
+
+      if (questStage === "rival" && !gameEnded) {
+        rival.position.y = groundHeight(rival.position.x, rival.position.z);
+        const dx = player.position.x - rival.position.x;
+        const dz = player.position.z - rival.position.z;
+        const distanceToRival = Math.hypot(dx, dz);
+        const targetRotation = Math.atan2(dx, dz);
+        const rotationDifference = THREE.MathUtils.euclideanModulo(
+          targetRotation - rival.rotation.y + Math.PI,
+          Math.PI * 2
+        ) - Math.PI;
+        rival.rotation.y += rotationDifference * (1 - Math.exp(-7 * delta));
+        if (distanceToRival > 2.6 && distanceToRival < 15) {
+          const rivalSpeed = 2.1;
+          rivalMoving = true;
+          rival.position.x += (dx / distanceToRival) * rivalSpeed * delta;
+          rival.position.z += (dz / distanceToRival) * rivalSpeed * delta;
+        } else if (distanceToRival <= 2.6 && elapsed > nextRivalAttack) {
+          playerHealth = Math.max(0, playerHealth - 12);
+          player.userData.hitStartedAt = elapsed;
+          nextRivalAttack = elapsed + 1.15;
+          updateHealthBars();
+          if (playerHealth === 0) finishGame(false);
+        }
+      }
+
+      for (const herb of herbs) {
+        if (herb.collected) continue;
+        herb.mesh.position.y = groundHeight(herb.mesh.position.x, herb.mesh.position.z)
+          + Math.sin(elapsed * 2 + herb.phase) * 0.09;
+        herb.mesh.rotation.y += delta * 0.45;
+      }
+
+      const moving = Math.abs(playerSpeed) > 0.18 && !gameEnded;
+      const bob = moving ? Math.max(0, Math.sin(playerGaitPhase * 2)) * (0.012 + Math.min(Math.abs(playerSpeed) / 8.6, 1) * 0.038) : 0;
+      player.position.y = groundHeight(player.position.x, player.position.z) + bob;
+      animateCatPose(player, elapsed, moving ? playerSpeed : 0, playerGaitPhase, turning);
+      animateCatPose(rival, elapsed, rivalMoving ? 2.1 : 0, rivalGaitPhase);
+
+      const behind = new THREE.Vector3(-Math.sin(player.rotation.y) * 8, 5.2, -Math.cos(player.rotation.y) * 8);
+      desiredCamera.set(player.position.x + behind.x, player.position.y + behind.y, player.position.z + behind.z);
+      camera.position.lerp(desiredCamera, 1 - Math.exp(-4.5 * delta));
+      lookTarget.set(player.position.x, player.position.y + 1.05, player.position.z + 0.4);
+      camera.lookAt(lookTarget);
+
+      updateChunkVisibility(elapsed);
+      drawMinimap();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio * 2, 3));
+    });
+  </script>
+</body>
+</html>
